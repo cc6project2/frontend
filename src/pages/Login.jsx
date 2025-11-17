@@ -1,5 +1,16 @@
+// src/pages/Login.jsx
 import { useState } from 'react'
-import { Box, Button, FormControl, FormLabel, Input, Heading, Text, useToast, VStack } from '@chakra-ui/react'
+import {
+  Box,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Heading,
+  Text,
+  useToast,
+  VStack
+} from '@chakra-ui/react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -7,6 +18,7 @@ const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
   const { login } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
@@ -16,26 +28,28 @@ const Login = () => {
     setLoading(true)
 
     try {
-      // Aquí irá la llamada al API real
-      // Por ahora simulamos un login exitoso
-      const mockUser = { nombre: 'Dr. Admin', rol: 'administrador', correo: email }
-      const mockToken = 'mock-jwt-token'
-      
-      login(mockUser, mockToken)
-      navigate('/dashboard')
-      
+      await login(email, password)
+
       toast({
-        title: 'Bienvenido',
-        description: 'Has iniciado sesión correctamente',
+        title: 'Inicio de sesión exitoso',
         status: 'success',
         duration: 3000,
+        isClosable: true
       })
-    } catch (error) {
+
+      // Redirige al dashboard (PrivateRoute ya validará el user)
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      console.error(err)
       toast({
-        title: 'Error',
-        description: 'Credenciales incorrectas',
+        title: 'Error al iniciar sesión',
+        description:
+          err.response?.data?.message ||
+          err.message ||
+          'Verifica tus credenciales',
         status: 'error',
-        duration: 3000,
+        duration: 4000,
+        isClosable: true
       })
     } finally {
       setLoading(false)
@@ -43,22 +57,33 @@ const Login = () => {
   }
 
   return (
-    <Box bg="white" p={8} borderRadius="lg" boxShadow="lg">
+    <Box
+      maxW="md"
+      mx="auto"
+      mt={20}
+      p={8}
+      borderWidth={1}
+      borderRadius="lg"
+      boxShadow="md"
+      bg="white"
+    >
       <VStack spacing={6} align="stretch">
         <Box textAlign="center">
-          <Heading size="lg" color="primary.600">Mi Clínica</Heading>
-          <Text color="gray.600" mt={2}>Sistema de Gestión Clínica</Text>
+          <Heading size="lg" mb={2}>
+            Mi Clínica
+          </Heading>
+          <Text color="gray.600">Inicia sesión para continuar</Text>
         </Box>
 
         <form onSubmit={handleSubmit}>
-          <VStack spacing={4}>
+          <VStack spacing={4} align="stretch">
             <FormControl isRequired>
               <FormLabel>Correo electrónico</FormLabel>
               <Input
                 type="email"
+                placeholder="admin@clinic.local"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="doctor@clinica.com"
               />
             </FormControl>
 
@@ -66,9 +91,9 @@ const Login = () => {
               <FormLabel>Contraseña</FormLabel>
               <Input
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
               />
             </FormControl>
 
@@ -88,4 +113,4 @@ const Login = () => {
   )
 }
 
-export default Login    
+export default Login

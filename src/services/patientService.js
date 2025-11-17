@@ -1,8 +1,27 @@
+// src/services/patientService.js
 import api from './api'
 
 export const patientService = {
-  getAll: async () => {
-    const response = await api.get('/patients')
+  /**
+   * Obtener listado de pacientes
+   * options: { search?: string, page?: number, pageSize?: number }
+   */
+  getAll: async (options = {}) => {
+    const {
+      search = '',
+      page = 1,
+      pageSize = 20
+    } = options
+
+    const params = { page, pageSize }
+
+    if (search && search.trim() !== '') {
+      params.search = search.trim()
+    }
+
+    const response = await api.get('/patients', { params })
+    // El backend devuelve un array de pacientes ya formateados:
+    // { id, nombre, dpi, edad, genero, telefono, direccion, email, activo, fechaRegistro }
     return response.data
   },
 
@@ -12,6 +31,7 @@ export const patientService = {
   },
 
   create: async (patientData) => {
+    // patientData debe incluir: nombre, dpi, edad, genero, telefono, direccion, email
     const response = await api.post('/patients', patientData)
     return response.data
   },
@@ -26,8 +46,10 @@ export const patientService = {
     return response.data
   },
 
+  /**
+   * search(term) = alias de getAll({ search: term })
+   */
   search: async (searchTerm) => {
-    const response = await api.get(`/patients/search?q=${searchTerm}`)
-    return response.data
+    return patientService.getAll({ search: searchTerm })
   }
 }

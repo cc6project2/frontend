@@ -1,11 +1,22 @@
+// src/pages/NewConsultation.jsx
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Box, Heading, Button, VStack, FormControl, FormLabel, Input,
-  Textarea, SimpleGrid, HStack, useToast
+  Box,
+  Heading,
+  Button,
+  VStack,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  SimpleGrid,
+  HStack,
+  useToast
 } from '@chakra-ui/react'
 import { FiArrowLeft, FiSave } from 'react-icons/fi'
 import Card from '../components/common/Card'
+import { consultationService } from '../services/consultationService'
 
 const NewConsultation = () => {
   const { patientId } = useParams()
@@ -14,74 +25,139 @@ const NewConsultation = () => {
 
   const [formData, setFormData] = useState({
     motivo: '',
+    diagnostico: '',
+    tratamiento: '',
+    observaciones: '',
+    examenFisico: '',
     presionArterial: '',
     frecuenciaCardiaca: '',
     temperatura: '',
     peso: '',
     talla: '',
-    examenFisico: '',
-    diagnostico: '',
-    tratamiento: '',
-    observaciones: '',
     proximaCita: ''
   })
 
   const [isLoading, setIsLoading] = useState(false)
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
 
-    setTimeout(() => {
+    try {
+      // Construimos el payload esperado por el backend
+      const payload = {
+        patientId: Number(patientId),
+        motivo: formData.motivo || null,
+        diagnostico: formData.diagnostico || null,
+        tratamiento: formData.tratamiento || null,
+        observaciones: formData.observaciones || null,
+        examenFisico: formData.examenFisico || null,
+        presionArterial: formData.presionArterial || null,
+        frecuenciaCardiaca: formData.frecuenciaCardiaca
+          ? Number(formData.frecuenciaCardiaca)
+          : null,
+        temperatura: formData.temperatura
+          ? Number(formData.temperatura)
+          : null,
+        peso: formData.peso ? Number(formData.peso) : null,
+        talla: formData.talla ? Number(formData.talla) : null,
+        proximaCita: formData.proximaCita || null
+      }
+
+      await consultationService.create(payload)
+
       toast({
         title: 'Consulta guardada',
         description: 'La consulta se ha registrado correctamente',
         status: 'success',
         duration: 3000,
+        isClosable: true
       })
-      setIsLoading(false)
+
+      // Volvemos al detalle del paciente
       navigate(`/patients/${patientId}`)
-    }, 1000)
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al guardar consulta',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleBack = () => {
+    navigate(`/patients/${patientId}`)
   }
 
   return (
     <Box>
-      <HStack mb={6}>
-        <Button leftIcon={<FiArrowLeft />} variant="ghost" onClick={() => navigate(`/patients/${patientId}`)}>
-          Volver
-        </Button>
-        <Heading size="lg">Nueva Consulta Médica</Heading>
+      <HStack justify="space-between" mb={6}>
+        <HStack>
+          <Button leftIcon={<FiArrowLeft />} variant="ghost" onClick={handleBack}>
+            Volver
+          </Button>
+          <Heading size="lg">Nueva consulta</Heading>
+        </HStack>
       </HStack>
 
       <form onSubmit={handleSubmit}>
-        <VStack spacing={6} align="stretch">
-          {/* Motivo de Consulta */}
+        <VStack align="stretch" spacing={6}>
+          {/* Motivo y diagnóstico */}
           <Card>
-            <Heading size="md" mb={4}>Motivo de Consulta</Heading>
-            <FormControl isRequired>
-              <Textarea
-                name="motivo"
-                value={formData.motivo}
-                onChange={handleChange}
-                placeholder="Describa el motivo de la consulta..."
-                rows={3}
-              />
-            </FormControl>
+            <VStack align="stretch" spacing={4}>
+              <FormControl isRequired>
+                <FormLabel>Motivo de consulta</FormLabel>
+                <Textarea
+                  name="motivo"
+                  value={formData.motivo}
+                  onChange={handleChange}
+                  placeholder="Describa el motivo principal de la consulta"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Diagnóstico</FormLabel>
+                <Textarea
+                  name="diagnostico"
+                  value={formData.diagnostico}
+                  onChange={handleChange}
+                  placeholder="Diagnóstico clínico"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Tratamiento</FormLabel>
+                <Textarea
+                  name="tratamiento"
+                  value={formData.tratamiento}
+                  onChange={handleChange}
+                  placeholder="Medicamentos, dosis y recomendaciones"
+                />
+              </FormControl>
+            </VStack>
           </Card>
 
-          {/* Signos Vitales */}
+          {/* Signos vitales */}
           <Card>
-            <Heading size="md" mb={4}>Signos Vitales</Heading>
+            <Heading size="md" mb={4}>
+              Signos vitales
+            </Heading>
             <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Presión Arterial</FormLabel>
+              <FormControl>
+                <FormLabel>Presión arterial (mmHg)</FormLabel>
                 <Input
                   name="presionArterial"
                   value={formData.presionArterial}
@@ -89,24 +165,38 @@ const NewConsultation = () => {
                   placeholder="120/80"
                 />
               </FormControl>
-              <FormControl isRequired>
-                <FormLabel>Frecuencia Cardíaca</FormLabel>
+
+              <FormControl>
+                <FormLabel>Frecuencia cardíaca (lpm)</FormLabel>
                 <Input
                   name="frecuenciaCardiaca"
+                  type="number"
                   value={formData.frecuenciaCardiaca}
                   onChange={handleChange}
-                  placeholder="72 lpm"
+                  placeholder="80"
                 />
               </FormControl>
-              <FormControl isRequired>
-                <FormLabel>Temperatura</FormLabel>
+
+              <FormControl>
+                <FormLabel>Temperatura (°C)</FormLabel>
                 <Input
                   name="temperatura"
+                  type="number"
+                  step="0.1"
                   value={formData.temperatura}
                   onChange={handleChange}
-                  placeholder="36.5°C"
+                  placeholder="36.5"
                 />
               </FormControl>
+            </SimpleGrid>
+          </Card>
+
+          {/* Medidas antropométricas */}
+          <Card>
+            <Heading size="md" mb={4}>
+              Medidas antropométricas
+            </Heading>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
               <FormControl>
                 <FormLabel>Peso (kg)</FormLabel>
                 <Input
@@ -117,6 +207,7 @@ const NewConsultation = () => {
                   placeholder="70"
                 />
               </FormControl>
+
               <FormControl>
                 <FormLabel>Talla (cm)</FormLabel>
                 <Input
@@ -130,64 +221,38 @@ const NewConsultation = () => {
             </SimpleGrid>
           </Card>
 
-          {/* Examen Físico */}
+          {/* Examen físico y observaciones */}
           <Card>
-            <Heading size="md" mb={4}>Examen Físico</Heading>
-            <FormControl isRequired>
-              <Textarea
-                name="examenFisico"
-                value={formData.examenFisico}
-                onChange={handleChange}
-                placeholder="Describa los hallazgos del examen físico..."
-                rows={4}
-              />
-            </FormControl>
+            <Heading size="md" mb={4}>
+              Examen físico y observaciones
+            </Heading>
+            <VStack align="stretch" spacing={4}>
+              <FormControl>
+                <FormLabel>Examen físico</FormLabel>
+                <Textarea
+                  name="examenFisico"
+                  value={formData.examenFisico}
+                  onChange={handleChange}
+                  placeholder="Descripción de hallazgos físicos"
+                />
+              </FormControl>
+
+              <FormControl>
+                <FormLabel>Observaciones</FormLabel>
+                <Textarea
+                  name="observaciones"
+                  value={formData.observaciones}
+                  onChange={handleChange}
+                  placeholder="Notas adicionales sobre el caso"
+                />
+              </FormControl>
+            </VStack>
           </Card>
 
-          {/* Diagnóstico */}
+          {/* Próxima cita */}
           <Card>
-            <Heading size="md" mb={4}>Diagnóstico</Heading>
-            <FormControl isRequired>
-              <Textarea
-                name="diagnostico"
-                value={formData.diagnostico}
-                onChange={handleChange}
-                placeholder="Diagnóstico médico..."
-                rows={3}
-              />
-            </FormControl>
-          </Card>
-
-          {/* Plan Terapéutico */}
-          <Card>
-            <Heading size="md" mb={4}>Plan Terapéutico</Heading>
-            <FormControl isRequired>
-              <FormLabel>Tratamiento</FormLabel>
-              <Textarea
-                name="tratamiento"
-                value={formData.tratamiento}
-                onChange={handleChange}
-                placeholder="Medicamentos, dosis, indicaciones..."
-                rows={4}
-              />
-            </FormControl>
-            <FormControl mt={4}>
-              <FormLabel>Observaciones</FormLabel>
-              <Textarea
-                name="observaciones"
-                value={formData.observaciones}
-                onChange={handleChange}
-                placeholder="Observaciones adicionales..."
-                rows={2}
-              />
-            </FormControl>
-          </Card>
-
-          {/* Próxima Cita */}
-          <Card>
-            <Heading size="md" mb={4}>Seguimiento</Heading>
             <FormControl>
-              <FormLabel>Fecha de Próxima Cita</FormLabel>
+              <FormLabel>Próxima cita (opcional)</FormLabel>
               <Input
                 name="proximaCita"
                 type="date"
@@ -198,8 +263,8 @@ const NewConsultation = () => {
           </Card>
 
           {/* Botones */}
-          <HStack justify="flex-end" spacing={4}>
-            <Button variant="ghost" onClick={() => navigate(`/patients/${patientId}`)}>
+          <HStack justify="flex-end">
+            <Button variant="ghost" onClick={handleBack}>
               Cancelar
             </Button>
             <Button

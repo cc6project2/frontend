@@ -1,166 +1,376 @@
-import { useState } from 'react'
-import { Box, Button, Heading, HStack, useDisclosure, useToast, Badge } from '@chakra-ui/react'
-import { FiUserPlus } from 'react-icons/fi'
+// src/pages/Users.jsx
+import { useEffect, useState } from 'react'
+import {
+  Box,
+  Heading,
+  HStack,
+  Button,
+  useDisclosure,
+  useToast,
+  Spinner,
+  VStack,
+  Text,
+  Badge,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  Switch
+} from '@chakra-ui/react'
+import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi'
+import Card from '../components/common/Card'
 import Modal from '../components/common/Modal'
-import Table from '../components/common/Table'
-import { VStack, FormControl, FormLabel, Input, Select } from '@chakra-ui/react'
+import { userService } from '../services/userService'
 import { ROLES } from '../utils/constants'
 
-const UserForm = ({ user, onSubmit, onCancel, isLoading }) => {
-  const [formData, setFormData] = useState({
-    nombre: user?.nombre || '',
-    correo: user?.correo || '',
-    rol: user?.rol || '',
-    password: ''
-  })
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    onSubmit(formData)
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <VStack spacing={4}>
-        <FormControl isRequired>
-          <FormLabel>Nombre Completo</FormLabel>
-          <Input name="nombre" value={formData.nombre} onChange={handleChange} />
-        </FormControl>
-
-        <FormControl isRequired>
-          <FormLabel>Correo Electrónico</FormLabel>
-          <Input name="correo" type="email" value={formData.correo} onChange={handleChange} />
-        </FormControl>
-
-        <FormControl isRequired>
-          <FormLabel>Rol</FormLabel>
-          <Select name="rol" value={formData.rol} onChange={handleChange}>
-            <option value="">Seleccionar rol</option>
-            <option value={ROLES.ADMIN}>Administrador</option>
-            <option value={ROLES.DOCTOR}>Médico</option>
-            <option value={ROLES.ASSISTANT}>Asistente</option>
-          </Select>
-        </FormControl>
-
-        {!user && (
-          <FormControl isRequired>
-            <FormLabel>Contraseña</FormLabel>
-            <Input name="password" type="password" value={formData.password} onChange={handleChange} />
-          </FormControl>
-        )}
-
-        <HStack w="full" justify="flex-end" spacing={3} pt={4}>
-          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-          <Button type="submit" colorScheme="primary" isLoading={isLoading}>
-            {user ? 'Actualizar' : 'Guardar'}
-          </Button>
-        </HStack>
-      </VStack>
-    </form>
-  )
+const roleLabels = {
+  [ROLES.ADMIN]: 'Administrador',
+  [ROLES.DOCTOR]: 'Médico',
+  [ROLES.ASSISTANT]: 'Asistente'
 }
 
 const Users = () => {
-  const [users, setUsers] = useState([
-    { id: 1, nombre: 'Dr. Juan García', correo: 'juan@clinica.com', rol: 'medico', activo: true },
-    { id: 2, nombre: 'Dr. María López', correo: 'maria@clinica.com', rol: 'medico', activo: true },
-    { id: 3, nombre: 'Admin Principal', correo: 'admin@clinica.com', rol: 'administrador', activo: true },
-    { id: 4, nombre: 'Ana Martínez', correo: 'ana@clinica.com', rol: 'asistente', activo: true },
-  ])
-
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [selectedUser, setSelectedUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    nombre: '',
+    correo: '',
+    username: '',
+    password: '',
+    rol: ROLES.DOCTOR,
+    activo: true
+  })
+
   const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
 
-  const getRoleBadge = (rol) => {
-    const colors = {
-      administrador: 'purple',
-      medico: 'blue',
-      asistente: 'green'
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      const data = await userService.getAll()
+      setUsers(data)
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al cargar usuarios',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setLoading(false)
     }
-    return <Badge colorScheme={colors[rol]}>{rol}</Badge>
   }
 
-  const formatUserData = (users) => {
-    return users.map(user => ({
-      id: user.id,
-      nombre: user.nombre,
-      correo: user.correo,
-      rol: getRoleBadge(user.rol),
-      estado: user.activo ? (
-        <Badge colorScheme="green">Activo</Badge>
-      ) : (
-        <Badge colorScheme="red">Inactivo</Badge>
-      )
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const openNewUserModal = () => {
+    setSelectedUser(null)
+    setFormData({
+      nombre: '',
+      correo: '',
+      username: '',
+      password: '',
+      rol: ROLES.DOCTOR,
+      activo: true
+    })
+    onOpen()
+  }
+
+  const openEditUserModal = (user) => {
+    setSelectedUser(user)
+    setFormData({
+      nombre: user.nombre || '',
+      correo: user.correo || '',
+      username: user.username || '',
+      password: '',
+      rol: user.rol,
+      activo: user.activo !== false
+    })
+    onOpen()
+  }
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
     }))
   }
 
-  const handleNew = () => {
-    setSelectedUser(null)
-    onOpen()
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
 
-  const handleEdit = (user) => {
-    setSelectedUser(user)
-    onOpen()
-  }
-
-  const handleSubmit = (formData) => {
-    setIsLoading(true)
-
-    setTimeout(() => {
+    try {
       if (selectedUser) {
-        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u))
-        toast({ title: 'Usuario actualizado', status: 'success', duration: 3000 })
+        // Update
+        const payload = {
+          nombre: formData.nombre,
+          correo: formData.correo,
+          username: formData.username,
+          rol: formData.rol,
+          activo: formData.activo
+        }
+
+        // Solo incluir password si el admin escribió algo
+        if (formData.password && formData.password.trim() !== '') {
+          payload.password = formData.password
+        }
+
+        await userService.update(selectedUser.id, payload)
+
+        toast({
+          title: 'Usuario actualizado',
+          status: 'success',
+          duration: 3000,
+          isClosable: true
+        })
       } else {
-        const newUser = { id: users.length + 1, ...formData, activo: true }
-        setUsers([...users, newUser])
-        toast({ title: 'Usuario creado', status: 'success', duration: 3000 })
+        // Create
+        const payload = {
+          nombre: formData.nombre,
+          correo: formData.correo,
+          username: formData.username,
+          password: formData.password,
+          rol: formData.rol
+        }
+
+        if (!payload.password) {
+          toast({
+            title: 'La contraseña es requerida para crear usuario',
+            status: 'warning',
+            duration: 3000,
+            isClosable: true
+          })
+          setSaving(false)
+          return
+        }
+
+        await userService.create(payload)
+
+        toast({
+          title: 'Usuario creado',
+          status: 'success',
+          duration: 3000,
+          isClosable: true
+        })
       }
 
-      setIsLoading(false)
       onClose()
-    }, 1000)
+      setSelectedUser(null)
+      await loadUsers()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al guardar usuario',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const headers = ['ID', 'Nombre', 'Correo', 'Rol', 'Estado']
+  const handleDelete = async (user) => {
+    const confirmed = window.confirm(
+      `¿Estás seguro de eliminar/desactivar al usuario "${user.nombre}"?`
+    )
+    if (!confirmed) return
+
+    try {
+      setSaving(true)
+      await userService.delete(user.id)
+      toast({
+        title: 'Usuario eliminado/desactivado',
+        status: 'success',
+        duration: 3000,
+        isClosable: true
+      })
+      await loadUsers()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al eliminar usuario',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <Box>
       <HStack justify="space-between" mb={6}>
-        <Heading size="lg">Gestión de Usuarios</Heading>
-        <Button leftIcon={<FiUserPlus />} colorScheme="primary" onClick={handleNew}>
-          Nuevo Usuario
+        <Heading size="lg">Usuarios</Heading>
+        <Button
+          leftIcon={<FiPlus />}
+          colorScheme="primary"
+          onClick={openNewUserModal}
+          isLoading={saving}
+        >
+          Nuevo usuario
         </Button>
       </HStack>
 
-      <Box bg="white" borderRadius="lg" boxShadow="sm">
-        <Table
-          headers={headers}
-          data={formatUserData(users)}
-          onRowClick={handleEdit}
-        />
-      </Box>
+      {loading ? (
+        <HStack justify="center" py={10}>
+          <Spinner size="lg" />
+        </HStack>
+      ) : (
+        <VStack spacing={4} align="stretch">
+          {users.map((user) => (
+            <Card key={user.id}>
+              <HStack justify="space-between" align="flex-start">
+                <Box>
+                  <Text fontWeight="bold">{user.nombre}</Text>
+                  <Text fontSize="sm" color="gray.600">
+                    {user.correo}
+                  </Text>
+                  <Text fontSize="sm" color="gray.500">
+                    Usuario: {user.username}
+                  </Text>
+                  <HStack mt={2} spacing={2}>
+                    <Badge colorScheme="blue">
+                      {roleLabels[user.rol] || user.rol}
+                    </Badge>
+                    <Badge colorScheme={user.activo ? 'green' : 'red'}>
+                      {user.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </HStack>
+                </Box>
+                <HStack spacing={2}>
+                  <Button
+                    size="sm"
+                    leftIcon={<FiEdit />}
+                    variant="outline"
+                    onClick={() => openEditUserModal(user)}
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    leftIcon={<FiTrash2 />}
+                    variant="outline"
+                    colorScheme="red"
+                    onClick={() => handleDelete(user)}
+                    isLoading={saving}
+                  >
+                    Eliminar
+                  </Button>
+                </HStack>
+              </HStack>
+            </Card>
+          ))}
+
+          {users.length === 0 && (
+            <Card textAlign="center" py={8}>
+              <Text color="gray.500">
+                No hay usuarios registrados. Crea el primero.
+              </Text>
+            </Card>
+          )}
+        </VStack>
+      )}
 
       <Modal
         isOpen={isOpen}
-        onClose={onClose}
-        title={selectedUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+        onClose={() => {
+          onClose()
+          setSelectedUser(null)
+        }}
+        title={selectedUser ? 'Editar usuario' : 'Nuevo usuario'}
       >
-        <UserForm
-          user={selectedUser}
-          onSubmit={handleSubmit}
-          onCancel={onClose}
-          isLoading={isLoading}
-        />
+        <form onSubmit={handleSubmit}>
+          <VStack align="stretch" spacing={4}>
+            <FormControl isRequired>
+              <FormLabel>Nombre completo</FormLabel>
+              <Input
+                name="nombre"
+                value={formData.nombre}
+                onChange={handleChange}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Correo</FormLabel>
+              <Input
+                type="email"
+                name="correo"
+                value={formData.correo}
+                onChange={handleChange}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Username</FormLabel>
+              <Input
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+              />
+            </FormControl>
+
+            <FormControl isRequired={!selectedUser}>
+              <FormLabel>
+                Contraseña {selectedUser && '(deja vacío para no cambiar)'}
+              </FormLabel>
+              <Input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+              />
+            </FormControl>
+
+            <FormControl isRequired>
+              <FormLabel>Rol</FormLabel>
+              <Select
+                name="rol"
+                value={formData.rol}
+                onChange={handleChange}
+              >
+                <option value={ROLES.ADMIN}>Administrador</option>
+                <option value={ROLES.DOCTOR}>Médico</option>
+                <option value={ROLES.ASSISTANT}>Asistente</option>
+              </Select>
+            </FormControl>
+
+            {selectedUser && (
+              <FormControl display="flex" alignItems="center">
+                <FormLabel mb="0">Activo</FormLabel>
+                <Switch
+                  name="activo"
+                  isChecked={formData.activo}
+                  onChange={handleChange}
+                />
+              </FormControl>
+            )}
+
+            <HStack justify="flex-end">
+              <Button variant="ghost" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                colorScheme="primary"
+                isLoading={saving}
+              >
+                Guardar
+              </Button>
+            </HStack>
+          </VStack>
+        </form>
       </Modal>
     </Box>
   )

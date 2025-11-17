@@ -1,24 +1,50 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from 'react'
+import { authService } from '../services/authService'
 
-const AuthContext = createContext()
+const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Hidratar desde localStorage al cargar la app
   useEffect(() => {
     const token = localStorage.getItem('token')
     const userData = localStorage.getItem('user')
+
     if (token && userData) {
-      setUser(JSON.parse(userData))
+      try {
+        const parsed = JSON.parse(userData)
+        setUser(parsed)
+      } catch {
+        // Si algo está corrupto, limpiamos
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        setUser(null)
+      }
     }
+
     setLoading(false)
   }, [])
 
-  const login = (userData, token) => {
-    localStorage.setItem('token', token)
-    localStorage.setItem('user', JSON.stringify(userData))
-    setUser(userData)
+  const login = async (email, password) => {
+    // authService.login → POST /auth/login { email, password }
+    // Backend debe devolver: { token, user }
+    const data = await authService.login(email, password)
+
+    if (!data || !data.token || !data.user) {
+      throw new Error('Respuesta de login inválida desde el servidor')
+    }
+
+    // Guardar en localStorage
+    localStorage.setItem('token', data.token)
+    localStorage.setItem('user', JSON.stringify(data.user))
+
+    // Actualizar contexto
+    setUser(data.user)
+
+    return data.user
   }
 
   const logout = () => {

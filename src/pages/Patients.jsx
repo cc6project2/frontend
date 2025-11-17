@@ -1,111 +1,187 @@
+// src/pages/Patients.jsx
 import { useState } from 'react'
-import { Box, Button, Heading, HStack, useDisclosure, useToast } from '@chakra-ui/react'
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  useDisclosure,
+  useToast,
+  Spinner,
+  Text
+} from '@chakra-ui/react'
 import { FiPlus } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 import SearchBar from '../components/common/SearchBar'
 import Modal from '../components/common/Modal'
 import PatientForm from '../components/patients/PatientForm'
 import PatientList from '../components/patients/PatientList'
+import { usePatients } from '../hooks/usePatients'
+import { patientService } from '../services/patientService'
 
 const Patients = () => {
-  const [patients, setPatients] = useState([
-    { id: 1, nombre: 'Juan Pérez', dpi: '1234567890123', edad: 35, genero: 'M', telefono: '12345678', direccion: 'Zona 1, Ciudad', email: 'juan@email.com' },
-    { id: 2, nombre: 'María García', dpi: '9876543210987', edad: 28, genero: 'F', telefono: '87654321', direccion: 'Zona 10, Ciudad', email: 'maria@email.com' },
-    { id: 3, nombre: 'Carlos López', dpi: '5555555555555', edad: 42, genero: 'M', telefono: '55555555', direccion: 'Zona 5, Ciudad', email: 'carlos@email.com' },
-  ])
-
+  const { patients, loading, error, fetchPatients } = usePatients()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedPatient, setSelectedPatient] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  
+  const [isSaving, setIsSaving] = useState(false)
+
   const { isOpen, onOpen, onClose } = useDisclosure()
-  const navigate = useNavigate()
   const toast = useToast()
+  const navigate = useNavigate()
 
-  const filteredPatients = patients.filter(patient =>
-    patient.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.dpi.includes(searchTerm)
-  )
+  const handleSearchChange = async (e) => {
+    const value = e.target.value
+    setSearchTerm(value)
+    // Búsqueda simple en tiempo real contra el backend
+    await fetchPatients({ search: value })
+  }
 
-  const handleNew = () => {
+  const handleNewPatient = () => {
     setSelectedPatient(null)
     onOpen()
   }
 
-  const handleEdit = (patient) => {
+  const handleEditPatient = (patient) => {
     setSelectedPatient(patient)
     onOpen()
   }
 
-  const handleView = (patient) => {
+  const handleViewPatient = (patient) => {
     navigate(`/patients/${patient.id}`)
   }
 
-  const handleDelete = (patient) => {
-    if (window.confirm(`¿Eliminar a ${patient.nombre}?`)) {
-      setPatients(patients.filter(p => p.id !== patient.id))
+  const handleDeletePatient = async (patient) => {
+    const confirmed = window.confirm(
+      `¿Estás seguro de eliminar al paciente "${patient.nombre}"?`
+    )
+    if (!confirmed) return
+
+    try {
+      setIsSaving(true)
+      await patientService.delete(patient.id)
       toast({
         title: 'Paciente eliminado',
         status: 'success',
         duration: 3000,
+        isClosable: true
       })
+      await fetchPatients({ search: searchTerm })
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al eliminar paciente',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  const handleSubmit = (formData) => {
-    setIsLoading(true)
-    
-    setTimeout(() => {
+  const handleSubmit = async (formData) => {
+    try {
+      setIsSaving(true)
+
       if (selectedPatient) {
-        setPatients(patients.map(p => p.id === selectedPatient.id ? { ...p, ...formData } : p))
-        toast({ title: 'Paciente actualizado', status: 'success', duration: 3000 })
+        // Update
+        await patientService.update(selectedPatient.id, formData)
+        toast({
+          title: 'Paciente actualizado',
+          status: 'success',
+          duration: 3000,
+          isClosable: true
+        })
       } else {
-        const newPatient = { id: patients.length + 1, ...formData }
-        setPatients([...patients, newPatient])
-        toast({ title: 'Paciente creado', status: 'success', duration: 3000 })
+        // Create
+        await patientService.create(formData)
+        toast({
+          title: 'Paciente creado',
+          status: 'success',
+          duration: 3000,
+          isClosable: true
+        })
       }
-      
-      setIsLoading(false)
+
       onClose()
-    }, 1000)
+      setSelectedPatient(null)
+      await fetchPatients({ search: searchTerm })
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Error al guardar paciente',
+        description: err.message || 'Intenta de nuevo más tarde',
+        status: 'error',
+        duration: 4000,
+        isClosable: true
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
     <Box>
       <HStack justify="space-between" mb={6}>
         <Heading size="lg">Pacientes</Heading>
-        <Button leftIcon={<FiPlus />} colorScheme="primary" onClick={handleNew}>
+        <Button
+          leftIcon={<FiPlus />}
+          colorScheme="primary"
+          onClick={handleNewPatient}
+          isLoading={isSaving}
+        >
           Nuevo Paciente
         </Button>
       </HStack>
 
-      <Box mb={6}>
-        <SearchBar
-          placeholder="Buscar por nombre o DPI..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </Box>
+      <HStack mb={4} justify="space-between">
+        <Box flex="1">
+          <SearchBar
+            placeholder="Buscar por nombre, DPI o email..."
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
+        </Box>
+      </HStack>
 
-      <Box bg="white" borderRadius="lg" boxShadow="sm">
+      {error && (
+        <Box mb={4}>
+          <Text color="red.500" fontSize="sm">
+            {error}
+          </Text>
+        </Box>
+      )}
+
+      {loading ? (
+        <HStack justify="center" py={10}>
+          <Spinner size="lg" />
+        </HStack>
+      ) : (
         <PatientList
-          patients={filteredPatients}
-          onView={handleView}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
+          patients={patients}
+          onView={handleViewPatient}
+          onEdit={handleEditPatient}
+          onDelete={handleDeletePatient}
         />
-      </Box>
+      )}
 
       <Modal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={() => {
+          onClose()
+          setSelectedPatient(null)
+        }}
         title={selectedPatient ? 'Editar Paciente' : 'Nuevo Paciente'}
       >
         <PatientForm
           patient={selectedPatient}
           onSubmit={handleSubmit}
-          onCancel={onClose}
-          isLoading={isLoading}
+          onCancel={() => {
+            onClose()
+            setSelectedPatient(null)
+          }}
+          isLoading={isSaving}
         />
       </Modal>
     </Box>

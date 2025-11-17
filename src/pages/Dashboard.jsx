@@ -1,71 +1,212 @@
-import { Box, SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText, Heading, VStack, HStack, Text, Badge } from '@chakra-ui/react'
-import { FiCalendar } from 'react-icons/fi'
+// src/pages/Dashboard.jsx
+import { useEffect, useState } from 'react'
+import {
+  Box,
+  SimpleGrid,
+  Stat,
+  StatLabel,
+  StatNumber,
+  StatHelpText,
+  Heading,
+  VStack,
+  HStack,
+  Text,
+  Badge,
+  Spinner,
+  useToast
+} from '@chakra-ui/react'
+import { FiCalendar, FiUsers, FiActivity } from 'react-icons/fi'
 import Card from '../components/common/Card'
 import { formatDate } from '../utils/formatters'
+import { dashboardService } from '../services/dashboardService'
 
 const Dashboard = () => {
-  const proximasCitas = [
-    { id: 1, paciente: 'Juan Pérez', fecha: '2024-11-16', hora: '09:00' },
-    { id: 2, paciente: 'María García', fecha: '2024-11-16', hora: '10:30' },
-    { id: 3, paciente: 'Carlos López', fecha: '2024-11-17', hora: '14:00' },
-  ]
+  const [summary, setSummary] = useState({
+    totalPatients: 0,
+    totalConsultationsToday: 0,
+    upcomingAppointments: []
+  })
+  const [loading, setLoading] = useState(false)
+  const toast = useToast()
+
+  useEffect(() => {
+    const loadSummary = async () => {
+      try {
+        setLoading(true)
+        const data = await dashboardService.getSummary()
+        setSummary({
+          totalPatients: data.totalPatients ?? 0,
+          totalConsultationsToday: data.totalConsultationsToday ?? 0,
+          upcomingAppointments: Array.isArray(data.upcomingAppointments)
+            ? data.upcomingAppointments
+            : []
+        })
+      } catch (err) {
+        console.error(err)
+        toast({
+          title: 'Error al cargar dashboard',
+          description: err.message || 'Intenta de nuevo más tarde',
+          status: 'error',
+          duration: 4000,
+          isClosable: true
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadSummary()
+  }, [toast])
+
+  const { totalPatients, totalConsultationsToday, upcomingAppointments } = summary
+
+  const formatTime = (date) => {
+    if (!date) return ''
+    const d = new Date(date)
+    return d.toLocaleTimeString('es-GT', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
 
   return (
     <Box>
-      <Heading size="lg" mb={6}>Dashboard</Heading>
+      <Heading size="lg" mb={6}>
+        Dashboard
+      </Heading>
 
-      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
+      {loading && (
+        <HStack justify="center" py={8}>
+          <Spinner size="lg" />
+        </HStack>
+      )}
+
+      {/* Estadísticas rápidas */}
+      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={6}>
         <Card>
-          <Stat>
-            <StatLabel color="gray.600">Total Pacientes</StatLabel>
-            <StatNumber fontSize="3xl" color="primary.600">156</StatNumber>
-            <StatHelpText>+12 este mes</StatHelpText>
-          </Stat>
+          <HStack justify="space-between">
+            <Stat>
+              <StatLabel>Pacientes registrados</StatLabel>
+              <StatNumber>{totalPatients}</StatNumber>
+              <StatHelpText>Total en el sistema</StatHelpText>
+            </Stat>
+            <Box
+              bg="primary.50"
+              borderRadius="full"
+              p={3}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <FiUsers size={20} color="#2B6CB0" />
+            </Box>
+          </HStack>
         </Card>
 
         <Card>
-          <Stat>
-            <StatLabel color="gray.600">Consultas Hoy</StatLabel>
-            <StatNumber fontSize="3xl" color="green.600">8</StatNumber>
-            <StatHelpText>4 completadas</StatHelpText>
-          </Stat>
+          <HStack justify="space-between">
+            <Stat>
+              <StatLabel>Consultas hoy</StatLabel>
+              <StatNumber>{totalConsultationsToday}</StatNumber>
+              <StatHelpText>Registradas en la fecha actual</StatHelpText>
+            </Stat>
+            <Box
+              bg="green.50"
+              borderRadius="full"
+              p={3}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <FiActivity size={20} color="#2F855A" />
+            </Box>
+          </HStack>
         </Card>
 
         <Card>
-          <Stat>
-            <StatLabel color="gray.600">Próximas Citas</StatLabel>
-            <StatNumber fontSize="3xl" color="orange.600">23</StatNumber>
-            <StatHelpText>Esta semana</StatHelpText>
-          </Stat>
+          <HStack justify="space-between">
+            <Stat>
+              <StatLabel>Próximas citas</StatLabel>
+              <StatNumber>{upcomingAppointments.length}</StatNumber>
+              <StatHelpText>Próximas 5 citas programadas</StatHelpText>
+            </Stat>
+            <Box
+              bg="purple.50"
+              borderRadius="full"
+              p={3}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <FiCalendar size={20} color="#6B46C1" />
+            </Box>
+          </HStack>
         </Card>
       </SimpleGrid>
 
-      <Card>
-        <Heading size="md" mb={4}>Próximas Citas</Heading>
-        <VStack spacing={3} align="stretch">
-          {proximasCitas.map((cita) => (
-            <HStack
-              key={cita.id}
-              p={3}
-              bg="gray.50"
-              borderRadius="md"
-              justify="space-between"
-              _hover={{ bg: 'gray.100' }}
-            >
-              <HStack spacing={3}>
-                <Box color="primary.600">
-                  <FiCalendar size={20} />
-                </Box>
-                <Box>
-                  <Text fontWeight="bold">{cita.paciente}</Text>
-                  <Text fontSize="sm" color="gray.600">{formatDate(cita.fecha)} - {cita.hora}</Text>
-                </Box>
-              </HStack>
-              <Badge colorScheme="blue">Programada</Badge>
-            </HStack>
-          ))}
-        </VStack>
-      </Card>
+      {/* Próximas citas */}
+      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+        <Card>
+          <Heading size="md" mb={4}>
+            Próximas citas
+          </Heading>
+
+          {upcomingAppointments.length === 0 ? (
+            <Text color="gray.500">No hay citas próximas programadas.</Text>
+          ) : (
+            <VStack align="stretch" spacing={3}>
+              {upcomingAppointments.map((cita) => (
+                <HStack
+                  key={cita.id}
+                  justify="space-between"
+                  p={3}
+                  borderRadius="md"
+                  bg="gray.50"
+                >
+                  <HStack spacing={3}>
+                    <Box
+                      bg="primary.100"
+                      borderRadius="full"
+                      p={2}
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <FiCalendar size={16} />
+                    </Box>
+                    <Box>
+                      <Text fontWeight="bold">{cita.paciente}</Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {formatDate(cita.fechaHora)} - {formatTime(cita.fechaHora)}
+                      </Text>
+                      {cita.medico && (
+                        <Text fontSize="xs" color="gray.500">
+                          {cita.medico}
+                        </Text>
+                      )}
+                    </Box>
+                  </HStack>
+                  <Badge colorScheme="blue">Programada</Badge>
+                </HStack>
+              ))}
+            </VStack>
+          )}
+        </Card>
+
+        {/* Aquí dejamos un card “libre” para futuro:
+            - gráfico simple
+            - resumen por médico
+            - métricas de productividad, etc. */}
+        <Card>
+          <Heading size="md" mb={4}>
+            Resumen general
+          </Heading>
+          <Text color="gray.600">
+            En futuras versiones puedes usar este espacio para mostrar gráficas
+            de distribución por médico, tipos de consulta, horas pico, etc.
+          </Text>
+        </Card>
+      </SimpleGrid>
     </Box>
   )
 }
